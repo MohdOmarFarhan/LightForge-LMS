@@ -31,6 +31,7 @@ class User extends Authenticatable
         'role',
         'is_approved',
         'password',
+        'profile_photo_path',
     ];
 
     /**
@@ -54,5 +55,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function examAttempts()
+    {
+        return $this->hasMany(ExamAttempt::class);
     }
 }

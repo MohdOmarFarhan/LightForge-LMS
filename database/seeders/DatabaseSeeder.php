@@ -37,5 +37,9 @@ class DatabaseSeeder extends Seeder
             'whatsapp_no' => '01700000000',
             'guardian_no' => '01700000000',
         ]);
+
+        $this->call([
+            StudentSeeder::class,
+        ]);
     }
 }
