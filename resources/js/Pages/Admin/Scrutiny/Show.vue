@@ -95,16 +95,18 @@ const submit = () => {
                             <div class="pt-4 border-t border-[#374151]">
                                 <p class="text-sm font-semibold text-[#0D6EFD] mb-2 font-onest">Student's Answer</p>
                                 <!-- Text Answer -->
-                                <p v-if="answer.answer_text" class="text-white font-onest whitespace-pre-wrap">{{ answer.answer_text }}</p>
+                                <div v-if="answer.answer_text" class="text-white font-onest prose prose-invert max-w-none ql-editor" v-html="answer.answer_text"></div>
                                 
                                 <!-- Image Answer (Mock for now) -->
-                                <div v-if="answer.answer_images && answer.answer_images.length > 0" class="mt-2 grid grid-cols-2 gap-2">
-                                    <div v-for="(img, i) in answer.answer_images" :key="i" class="relative aspect-video bg-black rounded-lg overflow-hidden border border-[#374151]">
-                                        <img :src="img" class="w-full h-full object-contain" />
+                                <div v-if="answer.answer_images && answer.answer_images.length > 0" class="mt-4 grid grid-cols-2 gap-4">
+                                    <div v-for="(img, i) in answer.answer_images" :key="i" class="relative group">
+                                        <div class="aspect-video bg-black rounded-lg overflow-hidden border border-[#374151]">
+                                            <img :src="img" class="w-full h-full object-contain" />
+                                        </div>
                                     </div>
                                 </div>
                                 
-                                <p v-if="!answer.answer_text && (!answer.answer_images || answer.answer_images.length === 0)" class="text-[#DC2626] italic text-sm">No answer provided.</p>
+                                <p v-if="!answer.answer_text && (!answer.answer_images || answer.answer_images.length === 0)" class="text-[#DC2626] italic text-sm mt-2">No answer provided.</p>
                             </div>
                         </div>
 

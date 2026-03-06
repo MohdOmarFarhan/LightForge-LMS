@@ -23,7 +23,7 @@ class DashboardController extends Controller
         // Exams for student's class, published, start_time in future OR (started but not submitted)
         // Actually, "Upcoming" usually means start_time > now.
         // But let's show exams that are available to take.
-        $upcomingExams = Exam::where('class', $user->class)
+        $upcomingExams = Exam::where('target_class', $user->class)
             ->where('is_published', true)
             ->where('end_time', '>', now()) // Not expired
             ->whereDoesntHave('attempts', function ($q) use ($user) {
@@ -36,7 +36,7 @@ class DashboardController extends Controller
                 return [
                     'id' => $exam->id,
                     'title' => $exam->title,
-                    'subject' => $exam->subject,
+                    'subject' => $exam->subject ? $exam->subject->name : 'Mixed',
                     'date' => $exam->start_time->format('M d, Y'),
                     'time' => $exam->start_time->format('h:i A') . ' - ' . $exam->end_time->format('h:i A'),
                     'duration' => $exam->duration_minutes . ' min',

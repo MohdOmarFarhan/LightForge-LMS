@@ -194,7 +194,7 @@ const startExam = (examId) => {
                                 <!-- Subject Badge -->
                                 <div class="inline-flex items-center px-3 py-1 rounded-full bg-[#E3F2FD] dark:bg-[#1A2744] mb-3">
                                     <span class="font-inter text-xs font-medium text-[#0066FF] dark:text-[#2196F3] transition-colors duration-200">
-                                        {{ exam.subject }}
+                                        {{ exam.subject?.name || 'Mixed' }}
                                     </span>
                                 </div>
 

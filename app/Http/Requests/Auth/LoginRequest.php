@@ -58,13 +58,10 @@ class LoginRequest extends FormRequest
         }
 
         $user = Auth::user();
-        if (!$user->is_approved && $user->role !== 'admin') {
-            Auth::logout();
-            
-            throw ValidationException::withMessages([
-                'email' => 'Your account is pending approval by the administrator.',
-            ]);
-        }
+        
+        // Ensure user is active/approved for dashboard access is handled in Controller
+        // But we DO want to allow them to log in so they can see the waiting lobby.
+        // So we remove any "Auth::logout()" logic that was preventing unapproved users from logging in.
 
         RateLimiter::clear($this->throttleKey());
     }

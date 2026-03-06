@@ -1,38 +1,113 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
-import { Plus, Search, Filter, FileQuestion, TrendingUp, Users, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ref, watch, computed } from 'vue';
+import { Plus, Search, Filter, FileQuestion, TrendingUp, Users, ChevronLeft, ChevronRight, Edit, Trash2, Eye } from 'lucide-vue-next';
+
+// ...
+
+const deleteQuestion = (id) => {
+    if (confirm('Are you sure you want to delete this question?')) {
+        router.delete(route('admin.questions.destroy', id), {
+            preserveScroll: true,
+        });
+    }
+};
 import { debounce } from 'lodash';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(relativeTime);
 
+const stripHtml = (html) => {
+    if (!html) return '';
+    const tmp = document.createElement("DIV");
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || "";
+};
+
 const props = defineProps({
     questions: Object,
     filters: Object,
     stats: Object,
-    subjectStats: Array,
+    allSubjects: Array,
+    levels: Array,
 });
 
-const selectedClass = ref(props.filters.class || "all");
-const selectedSubject = ref(props.filters.subject || "all");
+const selectedLevel = ref(props.filters.level_id || "all");
+const selectedSubjectId = ref(props.filters.subject_id || "all");
 const selectedType = ref(props.filters.type || "all");
+const selectedPaperId = ref(props.filters.paper_id || "all");
+const selectedChapterId = ref(props.filters.chapter_id || "all");
+
+// Computed properties for cascading filters
+const availablePapers = computed(() => {
+    if (selectedSubjectId.value === 'all') return [];
+    const subject = props.allSubjects.find(s => s.id === parseInt(selectedSubjectId.value));
+    return subject ? subject.papers : [];
+});
+
+const availableChapters = computed(() => {
+    if (selectedPaperId.value === 'all' || selectedSubjectId.value === 'all') return [];
+    const subject = props.allSubjects.find(s => s.id === parseInt(selectedSubjectId.value));
+    if (!subject) return [];
+    const paper = subject.papers.find(p => p.id === parseInt(selectedPaperId.value));
+    return paper ? paper.chapters : [];
+});
+
+// Watchers for cascading resets
+watch(selectedSubjectId, (newVal) => {
+    if (newVal === 'all') {
+        selectedPaperId.value = 'all';
+        selectedChapterId.value = 'all';
+    } else {
+        // Reset paper if not valid for new subject
+        if (selectedPaperId.value !== 'all') {
+             const subject = props.allSubjects.find(s => s.id === parseInt(newVal));
+             if (subject) {
+                 const hasPaper = subject.papers.some(p => p.id === parseInt(selectedPaperId.value));
+                 if (!hasPaper) {
+                     selectedPaperId.value = 'all';
+                     selectedChapterId.value = 'all';
+                 }
+             }
+        }
+    }
+});
+
+watch(selectedPaperId, (newVal) => {
+    if (newVal === 'all') {
+        selectedChapterId.value = 'all';
+    } else {
+        // Reset chapter if not valid
+        if (selectedChapterId.value !== 'all' && selectedSubjectId.value !== 'all') {
+            const subject = props.allSubjects.find(s => s.id === parseInt(selectedSubjectId.value));
+            if (subject) {
+                const paper = subject.papers.find(p => p.id === parseInt(newVal));
+                if (paper) {
+                    const hasChapter = paper.chapters.some(c => c.id === parseInt(selectedChapterId.value));
+                    if (!hasChapter) selectedChapterId.value = 'all';
+                }
+            }
+        }
+    }
+});
 
 const updateFilters = () => {
     router.get(
         route("admin.questions"),
         {
-            class: selectedClass.value,
-            subject: selectedSubject.value,
+            level_id: selectedLevel.value,
+            subject_id: selectedSubjectId.value,
             type: selectedType.value,
+            paper_id: selectedPaperId.value,
+            chapter_id: selectedChapterId.value,
         },
         { preserveState: true, preserveScroll: true }
     );
 };
 
-watch([selectedClass, selectedSubject, selectedType], debounce(updateFilters, 300));
+watch([selectedLevel, selectedSubjectId, selectedType, selectedPaperId, selectedChapterId], debounce(updateFilters, 300));
 </script>
 
 <template>
@@ -97,32 +172,21 @@ watch([selectedClass, selectedSubject, selectedType], debounce(updateFilters, 30
                     <Filter :size="20" class="text-[#0D6EFD]" />
                     <h3 class="text-lg font-bold text-white font-montserrat">Filters</h3>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-onest">
-                    <!-- Class Filter -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 font-onest">
+                    <!-- Level Filter -->
                     <div>
                         <label class="block text-sm font-semibold text-[#9CA3AF] mb-2">
-                            Class
+                            Level
                         </label>
-                        <div class="flex gap-2">
-                            <button
-                                @click="selectedClass = 'all'"
-                                :class="['flex-1 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200', selectedClass === 'all' ? 'bg-[#0D6EFD] text-white' : 'bg-[#1F2937] text-[#9CA3AF] hover:bg-[#374151]']"
-                            >
-                                All
-                            </button>
-                            <button
-                                @click="selectedClass = '11'"
-                                :class="['flex-1 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200', selectedClass === '11' ? 'bg-[#0D6EFD] text-white' : 'bg-[#1F2937] text-[#9CA3AF] hover:bg-[#374151]']"
-                            >
-                                Class 11
-                            </button>
-                            <button
-                                @click="selectedClass = '12'"
-                                :class="['flex-1 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200', selectedClass === '12' ? 'bg-[#0D6EFD] text-white' : 'bg-[#1F2937] text-[#9CA3AF] hover:bg-[#374151]']"
-                            >
-                                Class 12
-                            </button>
-                        </div>
+                        <select
+                            v-model="selectedLevel"
+                            class="w-full px-4 py-2 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors"
+                        >
+                            <option value="all">All Levels</option>
+                            <option v-for="level in levels" :key="level.id" :value="level.id">
+                                {{ level.name }}
+                            </option>
+                        </select>
                     </div>
 
                     <!-- Subject Filter -->
@@ -131,21 +195,54 @@ watch([selectedClass, selectedSubject, selectedType], debounce(updateFilters, 30
                             Subject
                         </label>
                         <select
-                            v-model="selectedSubject"
+                            v-model="selectedSubjectId"
                             class="w-full px-4 py-2 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors"
                         >
                             <option value="all">All Subjects</option>
-                            <option value="mathematics">Mathematics</option>
-                            <option value="physics">Physics</option>
-                            <option value="chemistry">Chemistry</option>
-                            <option value="biology">Biology</option>
+                            <option v-for="subject in allSubjects" :key="subject.id" :value="subject.id">
+                                {{ subject.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Paper Filter -->
+                    <div>
+                        <label class="block text-sm font-semibold text-[#9CA3AF] mb-2">
+                            Paper
+                        </label>
+                        <select
+                            v-model="selectedPaperId"
+                            :disabled="selectedSubjectId === 'all'"
+                            class="w-full px-4 py-2 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors disabled:opacity-50"
+                        >
+                            <option value="all">All Papers</option>
+                            <option v-for="paper in availablePapers" :key="paper.id" :value="paper.id">
+                                {{ paper.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Chapter Filter -->
+                    <div>
+                        <label class="block text-sm font-semibold text-[#9CA3AF] mb-2">
+                            Chapter
+                        </label>
+                        <select
+                            v-model="selectedChapterId"
+                            :disabled="selectedPaperId === 'all' || selectedSubjectId === 'all'"
+                            class="w-full px-4 py-2 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors disabled:opacity-50"
+                        >
+                            <option value="all">All Chapters</option>
+                            <option v-for="chapter in availableChapters" :key="chapter.id" :value="chapter.id">
+                                {{ chapter.name }}
+                            </option>
                         </select>
                     </div>
 
                     <!-- Type Filter -->
                     <div>
                         <label class="block text-sm font-semibold text-[#9CA3AF] mb-2">
-                            Question Type
+                            Type
                         </label>
                         <select
                             v-model="selectedType"
@@ -161,45 +258,13 @@ watch([selectedClass, selectedSubject, selectedType], debounce(updateFilters, 30
             </div>
 
             <!-- Subject-wise Breakdown -->
-            <div class="bg-[#161B22] border border-[#1F2937] rounded-xl p-6">
-                <h3 class="text-lg font-bold text-white mb-4 font-montserrat">
-                    Subject-wise Breakdown
-                </h3>
-                <div class="space-y-4">
-                    <div v-for="subject in subjectStats" :key="subject.subject" class="p-4 bg-[#0F1419] rounded-lg">
-                        <div class="flex items-center justify-between mb-3">
-                            <h4 class="text-base font-semibold text-white font-montserrat">
-                                {{ subject.subject }}
-                            </h4>
-                            <span class="text-sm font-bold text-[#0D6EFD] font-onest">
-                                {{ subject.total }} total
-                            </span>
-                        </div>
-                        <div class="grid grid-cols-3 gap-4 font-onest">
-                            <div>
-                                <p class="text-xs text-[#9CA3AF] mb-1">MCQ</p>
-                                <p class="text-lg font-bold text-white">{{ subject.mcq }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-[#9CA3AF] mb-1">CQ</p>
-                                <p class="text-lg font-bold text-white">{{ subject.cq }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-[#9CA3AF] mb-1">Descriptive</p>
-                                <p class="text-lg font-bold text-white">
-                                    {{ subject.descriptive }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- Removed as per request -->
 
             <!-- Recent Questions -->
             <div class="bg-[#161B22] border border-[#1F2937] rounded-xl overflow-hidden">
                 <div class="p-6 border-b border-[#1F2937]">
                     <h3 class="text-lg font-bold text-white font-montserrat">
-                        Recently Added Questions
+                        Questions List
                     </h3>
                 </div>
                 <div class="overflow-x-auto">
@@ -213,7 +278,13 @@ watch([selectedClass, selectedSubject, selectedType], debounce(updateFilters, 30
                                     Type
                                 </th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-[#9CA3AF] uppercase font-onest">
+                                    Question
+                                </th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-[#9CA3AF] uppercase font-onest">
                                     Subject
+                                </th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-[#9CA3AF] uppercase font-onest">
+                                    Paper
                                 </th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-[#9CA3AF] uppercase font-onest">
                                     Chapter
@@ -223,6 +294,9 @@ watch([selectedClass, selectedSubject, selectedType], debounce(updateFilters, 30
                                 </th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-[#9CA3AF] uppercase font-onest">
                                     Added
+                                </th>
+                                <th class="px-6 py-4 text-right text-xs font-semibold text-[#9CA3AF] uppercase font-onest">
+                                    Actions
                                 </th>
                             </tr>
                         </thead>
@@ -245,24 +319,61 @@ watch([selectedClass, selectedSubject, selectedType], debounce(updateFilters, 30
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">
+                                    <div class="max-w-md">
+                                        <p class="text-sm text-white font-onest truncate" :title="question.content">
+                                            {{ question.content.length > 50 ? question.content.substring(0, 50) + '...' : question.content }}
+                                        </p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
                                     <span class="text-sm text-white font-onest capitalize">
-                                        {{ question.subject }}
+                                        {{ question.subject?.name }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">
                                     <span class="text-sm text-[#9CA3AF] font-onest">
-                                        {{ question.chapter }}
+                                        {{ question.paper?.name }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="text-sm text-[#9CA3AF] font-onest">
+                                        {{ question.chapter?.name }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">
                                     <span class="px-3 py-1 bg-[#1F2937] text-white rounded-lg text-sm font-semibold font-onest">
-                                        Class {{ question.class }}
+                                        {{ question.level?.name }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">
                                     <span class="text-sm text-[#9CA3AF] font-onest">
                                         {{ dayjs(question.created_at).fromNow() }}
                                     </span>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <Link
+                                            :href="route('admin.questions.show', question.id)"
+                                            class="p-2 text-[#9CA3AF] hover:text-[#0D6EFD] hover:bg-[#1F2937] rounded-lg transition-colors"
+                                            title="View"
+                                        >
+                                            <Eye :size="18" />
+                                        </Link>
+                                        <Link
+                                            :href="route('admin.questions.edit', question.id)"
+                                            class="p-2 text-[#9CA3AF] hover:text-[#0D6EFD] hover:bg-[#1F2937] rounded-lg transition-colors"
+                                            title="Edit"
+                                        >
+                                            <Edit :size="18" />
+                                        </Link>
+                                        <button
+                                            @click="deleteQuestion(question.id)"
+                                            class="p-2 text-[#9CA3AF] hover:text-red-500 hover:bg-[#1F2937] rounded-lg transition-colors"
+                                            title="Delete"
+                                        >
+                                            <Trash2 :size="18" />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>

@@ -2,30 +2,39 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
-import { Plus, Search, Filter, Calendar, Clock, FileText, CheckCircle, Eye } from 'lucide-vue-next';
+import { Plus, Search, Filter, Calendar, Clock, FileText, CheckCircle, Eye, Edit, Trash2 } from 'lucide-vue-next';
+
+// ...
+
+const deleteExam = (id) => {
+    if (confirm('Are you sure you want to delete this exam?')) {
+        router.delete(route('admin.exams.destroy', id));
+    }
+};
 import { debounce } from 'lodash';
 import dayjs from 'dayjs';
 
 const props = defineProps({
     exams: Object,
     filters: Object,
+    subjects: Array,
 });
 
-const selectedClass = ref(props.filters.class || "all");
-const selectedSubject = ref(props.filters.subject || "all");
+const selectedClass = ref(props.filters.target_class || "all");
+const selectedSubjectId = ref(props.filters.subject_id || "all");
 
 const updateFilters = () => {
     router.get(
         route("admin.exams"),
         {
-            class: selectedClass.value,
-            subject: selectedSubject.value,
+            target_class: selectedClass.value,
+            subject_id: selectedSubjectId.value,
         },
         { preserveState: true, preserveScroll: true }
     );
 };
 
-watch([selectedClass, selectedSubject], debounce(updateFilters, 300));
+watch([selectedClass, selectedSubjectId], debounce(updateFilters, 300));
 
 const formatDate = (date) => {
     return dayjs(date).format('MMM D, YYYY h:mm A');
@@ -94,14 +103,11 @@ const formatDate = (date) => {
                             Subject
                         </label>
                         <select
-                            v-model="selectedSubject"
+                            v-model="selectedSubjectId"
                             class="w-full px-4 py-2 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors"
                         >
                             <option value="all">All Subjects</option>
-                            <option value="mathematics">Mathematics</option>
-                            <option value="physics">Physics</option>
-                            <option value="chemistry">Chemistry</option>
-                            <option value="biology">Biology</option>
+                            <option v-for="subject in subjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
                         </select>
                     </div>
                 </div>
@@ -146,8 +152,8 @@ const formatDate = (date) => {
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-onest">
-                                        <div class="text-white capitalize">{{ exam.subject }}</div>
-                                        <div class="text-[#9CA3AF] text-xs">Class {{ exam.class }} • {{ exam.paper }}</div>
+                                        <div class="text-white capitalize">{{ exam.subject?.name || 'Mixed' }}</div>
+                                        <div class="text-[#9CA3AF] text-xs">Class {{ exam.target_class }} • {{ exam.paper?.name || 'N/A' }}</div>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
@@ -180,12 +186,29 @@ const formatDate = (date) => {
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <button
-                                        class="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1F2937] hover:bg-[#374151] text-white rounded-lg text-sm font-semibold transition-all duration-200 font-onest"
-                                    >
-                                        <Eye :size="16" />
-                                        View
-                                    </button>
+                                    <div class="flex items-center gap-2">
+                                        <Link
+                                            :href="route('admin.exams.show', exam.id)"
+                                            class="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1F2937] hover:bg-[#374151] text-white rounded-lg text-sm font-semibold transition-all duration-200 font-onest"
+                                            title="View"
+                                        >
+                                            <Eye :size="16" />
+                                        </Link>
+                                        <Link
+                                            :href="route('admin.exams.edit', exam.id)"
+                                            class="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1F2937] hover:bg-[#374151] text-[#0D6EFD] rounded-lg text-sm font-semibold transition-all duration-200 font-onest"
+                                            title="Edit"
+                                        >
+                                            <Edit :size="16" />
+                                        </Link>
+                                        <button
+                                            @click="deleteExam(exam.id)"
+                                            class="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1F2937] hover:bg-[#374151] text-red-500 rounded-lg text-sm font-semibold transition-all duration-200 font-onest"
+                                            title="Delete"
+                                        >
+                                            <Trash2 :size="16" />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>

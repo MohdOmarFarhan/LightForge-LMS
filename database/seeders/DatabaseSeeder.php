@@ -39,7 +39,11 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call([
+            LevelSeeder::class,
+            AcademicStructureSeeder::class,
             StudentSeeder::class,
+            QuestionSeeder::class,
+            ExamSeeder::class,
         ]);
     }
 }

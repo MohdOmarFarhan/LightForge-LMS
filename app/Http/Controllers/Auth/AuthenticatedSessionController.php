@@ -33,6 +33,18 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $user = $request->user();
+
+        // Admin check
+        if ($user->role === 'admin') {
+            return redirect()->intended(route('admin.dashboard', absolute: false));
+        }
+
+        // Student Checks
+        if (!$user->is_approved || !$user->has_completed_onboarding) {
+            return redirect()->route('waiting-lobby');
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

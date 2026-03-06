@@ -1,6 +1,6 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { Head, Link, usePage, router } from '@inertiajs/vue3';
 import {
     GraduationCap,
     Clock,
@@ -10,23 +10,49 @@ import {
     Bell,
     Phone,
     Calendar,
-    LogOut
+    LogOut,
+    ArrowRight
 } from 'lucide-vue-next';
+
+const page = usePage();
+const user = computed(() => page.props.auth.user);
+const isApproved = computed(() => user.value?.is_approved);
 
 const currentStep = ref(1);
 let intervalId = null;
+let pollId = null;
+
+// Watch for approval status change
+watch(isApproved, (newVal) => {
+    if (newVal) {
+        if (intervalId) clearInterval(intervalId);
+        if (pollId) clearInterval(pollId);
+        currentStep.value = 3;
+    }
+});
 
 onMounted(() => {
-    intervalId = setInterval(() => {
-        currentStep.value = currentStep.value === 3 ? 1 : currentStep.value + 1;
-    }, 3000);
+    // If approved, stop the waiting animation and show the final state
+    if (isApproved.value) {
+        currentStep.value = 3;
+    } else {
+        intervalId = setInterval(() => {
+            currentStep.value = currentStep.value === 3 ? 1 : currentStep.value + 1;
+        }, 3000);
+
+        // Poll for status update
+        pollId = setInterval(() => {
+            router.reload({ only: ['auth'] });
+        }, 5000);
+    }
 });
 
 onUnmounted(() => {
     if (intervalId) clearInterval(intervalId);
+    if (pollId) clearInterval(pollId);
 });
 
-const steps = [
+const steps = computed(() => [
     {
         icon: CheckCircle2,
         label: "Application Submitted",
@@ -35,11 +61,20 @@ const steps = [
     {
         icon: Clock,
         label: "Under Review",
-        done: false,
-        active: true,
+        done: isApproved.value,
+        active: !isApproved.value,
     },
-    { icon: Sparkles, label: "Approval Pending", done: false },
-];
+    { 
+        icon: Sparkles, 
+        label: "Approval Pending", 
+        done: isApproved.value,
+        active: isApproved.value 
+    },
+]);
+
+const startJourney = () => {
+    router.post(route('complete-onboarding'));
+};
 </script>
 
 <template>
@@ -81,18 +116,21 @@ const steps = [
                             </div>
                         </div>
 
-                        <!-- Animated Clock Icon -->
+                        <!-- Approved: Checkmark, Pending: Clock -->
                         <div class="relative z-10 mb-6">
-                            <div class="w-32 h-32 bg-white/10 backdrop-blur-lg rounded-full flex items-center justify-center border-4 border-white/20">
+                            <div v-if="isApproved" class="w-32 h-32 bg-[#10B981]/20 backdrop-blur-lg rounded-full flex items-center justify-center border-4 border-[#10B981]/50">
+                                <CheckCircle2 :size="56" class="text-[#10B981] animate-bounce" />
+                            </div>
+                            <div v-else class="w-32 h-32 bg-white/10 backdrop-blur-lg rounded-full flex items-center justify-center border-4 border-white/20">
                                 <Clock :size="56" class="text-white animate-pulse" />
                             </div>
                         </div>
 
                         <h2 class="relative z-10 font-montserrat font-bold text-3xl text-center mb-4">
-                            Almost There!
+                            {{ isApproved ? 'You\'re In!' : 'Request Under Consideration' }}
                         </h2>
                         <p class="relative z-10 font-onest text-center text-white/80 text-lg mb-8">
-                            Your application is being reviewed by our admissions team
+                            {{ isApproved ? 'Your application has been approved.' : 'Your account is pending approval by the administrator.' }}
                         </p>
 
                         <!-- Progress Steps -->
@@ -124,94 +162,117 @@ const steps = [
                     <div class="p-12 flex flex-col justify-center">
                         <div class="mb-8">
                             <h1 class="font-montserrat font-bold text-4xl text-[#0A1929] dark:text-white mb-3">
-                                Welcome to the Waitlist! 🎓
+                                {{ isApproved ? 'Welcome Aboard! 🎉' : 'Account Pending Approval' }}
                             </h1>
                             <p class="text-[#64748B] dark:text-[#9CA3AF] font-onest text-lg">
-                                Thank you for registering with LightForge Academy. We're
-                                excited to have you join our community!
+                                {{ isApproved ? 'You now have full access to LightForge Academy. We\'re excited to see what you\'ll achieve!' : 'Thank you for registering. Your request is currently under consideration by the administration.' }}
                             </p>
                         </div>
 
-                        <!-- What's Next Section -->
-                        <div class="mb-8">
-                            <h3 class="font-montserrat font-bold text-xl text-[#0A1929] dark:text-white mb-4 flex items-center">
-                                <div class="w-2 h-2 bg-[#0066FF] rounded-full mr-3"></div>
-                                What Happens Next?
-                            </h3>
-                            <div class="space-y-4">
-                                <div class="flex items-start space-x-3">
-                                    <div class="w-8 h-8 bg-[#E3F2FD] dark:bg-[#0066FF]/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <Mail :size="16" class="text-[#0066FF]" />
-                                    </div>
-                                    <div>
-                                        <p class="font-onest font-semibold text-[#0A1929] dark:text-white text-sm">
-                                            Check Your Email
-                                        </p>
-                                        <p class="font-onest text-[#64748B] dark:text-[#9CA3AF] text-sm">
-                                            We've sent a confirmation to your registered email address
-                                        </p>
-                                    </div>
+                        <!-- APPROVED STATE -->
+                        <div v-if="isApproved">
+                             <!-- Student ID Display -->
+                            <div class="bg-gradient-to-br from-[#E3F2FD] to-[#DBEAFE] dark:from-[#0066FF]/5 dark:to-[#0052CC]/5 rounded-2xl p-6 mb-8 border border-[#0066FF]/20">
+                                <div class="flex items-center mb-3">
+                                    <Sparkles :size="18" class="text-[#0066FF] mr-2" />
+                                    <h4 class="font-montserrat font-bold text-[#0A1929] dark:text-white text-sm">
+                                        Your Official Student ID
+                                    </h4>
                                 </div>
-
-                                <div class="flex items-start space-x-3">
-                                    <div class="w-8 h-8 bg-[#E3F2FD] dark:bg-[#0066FF]/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <Clock :size="16" class="text-[#0066FF]" />
-                                    </div>
-                                    <div>
-                                        <p class="font-onest font-semibold text-[#0A1929] dark:text-white text-sm">
-                                            Review Process
-                                        </p>
-                                        <p class="font-onest text-[#64748B] dark:text-[#9CA3AF] text-sm">
-                                            Typically takes 24-48 hours during business days
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div class="flex items-start space-x-3">
-                                    <div class="w-8 h-8 bg-[#E3F2FD] dark:bg-[#0066FF]/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <Bell :size="16" class="text-[#0066FF]" />
-                                    </div>
-                                    <div>
-                                        <p class="font-onest font-semibold text-[#0A1929] dark:text-white text-sm">
-                                            Get Notified
-                                        </p>
-                                        <p class="font-onest text-[#64748B] dark:text-[#9CA3AF] text-sm">
-                                            You'll receive an email once your account is approved
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Student ID Preview -->
-                        <div class="bg-gradient-to-br from-[#E3F2FD] to-[#DBEAFE] dark:from-[#0066FF]/5 dark:to-[#0052CC]/5 rounded-2xl p-6 mb-8 border border-[#0066FF]/20">
-                            <div class="flex items-center mb-3">
-                                <Sparkles :size="18" class="text-[#0066FF] mr-2" />
-                                <h4 class="font-montserrat font-bold text-[#0A1929] dark:text-white text-sm">
-                                    Your Student ID
-                                </h4>
-                            </div>
-                            <p class="font-onest text-[#64748B] dark:text-[#9CA3AF] text-xs mb-2">
-                                Once approved, you'll receive your unique student ID:
-                            </p>
-                            <div class="bg-white dark:bg-[#1E1E1E] rounded-lg px-4 py-3 border-2 border-dashed border-[#0066FF]/30">
-                                <p class="font-mono font-bold text-2xl text-[#0066FF] text-center tracking-wider">
-                                    LFA-XXXXXX
+                                <p class="font-onest text-[#64748B] dark:text-[#9CA3AF] text-xs mb-2">
+                                    Please keep this ID safe for future reference:
                                 </p>
+                                <div class="bg-white dark:bg-[#1E1E1E] rounded-lg px-4 py-3 border-2 border-dashed border-[#0066FF]/30">
+                                    <p class="font-mono font-bold text-3xl text-[#0066FF] text-center tracking-wider">
+                                        {{ user.student_id }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button @click="startJourney" class="w-full bg-gradient-to-r from-[#16A34A] to-[#15803D] hover:from-[#15803D] hover:to-[#14532D] text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg shadow-[#16A34A]/30 hover:shadow-xl hover:shadow-[#16A34A]/40 transform hover:scale-[1.02] active:scale-[0.98] font-onest group mb-4">
+                                <span>Start Learning</span>
+                                <ArrowRight :size="20" />
+                            </button>
+                        </div>
+
+                        <!-- PENDING STATE -->
+                        <div v-else>
+                            <!-- Pending Student ID Display -->
+                            <div class="bg-gradient-to-br from-[#E3F2FD] to-[#DBEAFE] dark:from-[#0066FF]/5 dark:to-[#0052CC]/5 rounded-2xl p-6 mb-8 border border-[#0066FF]/20">
+                                <div class="flex items-center mb-3">
+                                    <Sparkles :size="18" class="text-[#0066FF] mr-2" />
+                                    <h4 class="font-montserrat font-bold text-[#0A1929] dark:text-white text-sm">
+                                        Your Student ID
+                                    </h4>
+                                </div>
+                                <p class="font-onest text-[#64748B] dark:text-[#9CA3AF] text-xs mb-2">
+                                    Your ID will be generated upon approval:
+                                </p>
+                                <div class="bg-white dark:bg-[#1E1E1E] rounded-lg px-4 py-3 border-2 border-dashed border-[#0066FF]/30">
+                                    <p class="font-mono font-bold text-3xl text-[#9CA3AF] text-center tracking-wider">
+                                        XXXXXX
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- What's Next Section -->
+                            <div class="mb-8">
+                                <h3 class="font-montserrat font-bold text-xl text-[#0A1929] dark:text-white mb-4 flex items-center">
+                                    <div class="w-2 h-2 bg-[#0066FF] rounded-full mr-3"></div>
+                                    What Happens Next?
+                                </h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-start space-x-3">
+                                        <div class="w-8 h-8 bg-[#E3F2FD] dark:bg-[#0066FF]/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <Mail :size="16" class="text-[#0066FF]" />
+                                        </div>
+                                        <div>
+                                            <p class="font-onest font-semibold text-[#0A1929] dark:text-white text-sm">
+                                                Check Your Email
+                                            </p>
+                                            <p class="font-onest text-[#64748B] dark:text-[#9CA3AF] text-sm">
+                                                We've sent a confirmation to your registered email address
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-start space-x-3">
+                                        <div class="w-8 h-8 bg-[#E3F2FD] dark:bg-[#0066FF]/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <Clock :size="16" class="text-[#0066FF]" />
+                                        </div>
+                                        <div>
+                                            <p class="font-onest font-semibold text-[#0A1929] dark:text-white text-sm">
+                                                Review Process
+                                            </p>
+                                            <p class="font-onest text-[#64748B] dark:text-[#9CA3AF] text-sm">
+                                                Typically takes 24-48 hours during business days
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-start space-x-3">
+                                        <div class="w-8 h-8 bg-[#E3F2FD] dark:bg-[#0066FF]/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <Bell :size="16" class="text-[#0066FF]" />
+                                        </div>
+                                        <div>
+                                            <p class="font-onest font-semibold text-[#0A1929] dark:text-white text-sm">
+                                                Get Notified
+                                            </p>
+                                            <p class="font-onest text-[#64748B] dark:text-[#9CA3AF] text-sm">
+                                                You'll receive an email once your account is approved
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Action Buttons -->
+                        <!-- Action Buttons (Common) -->
                         <div class="space-y-3">
-                            <Link :href="route('logout')" method="post" as="button" class="w-full bg-gradient-to-r from-[#0066FF] to-[#0052CC] hover:from-[#0052CC] hover:to-[#0047B3] text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg shadow-[#0066FF]/30 hover:shadow-xl hover:shadow-[#0066FF]/40 transform hover:scale-[1.02] active:scale-[0.98] font-onest group">
-                                <LogOut :size="20" />
-                                <span>Log Out</span>
+                            <Link :href="route('logout')" method="post" as="button" class="w-full bg-white dark:bg-[#262626] border-2 border-[#E2E8F0] dark:border-[#374151] hover:border-[#EF4444] hover:bg-[#EF4444]/5 text-[#0A1929] dark:text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 font-onest group">
+                                <LogOut :size="20" class="group-hover:text-[#EF4444] transition-colors" />
+                                <span class="group-hover:text-[#EF4444] transition-colors">Log Out</span>
                             </Link>
-
-                            <button class="w-full bg-white dark:bg-[#262626] border-2 border-[#E2E8F0] dark:border-[#374151] hover:border-[#0066FF] text-[#0A1929] dark:text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 hover:shadow-lg transform hover:scale-[1.01] active:scale-[0.99] font-onest group">
-                                <Phone :size="20" class="text-[#0066FF]" />
-                                <span>Contact Support</span>
-                            </button>
                         </div>
 
                         <!-- Footer Note -->

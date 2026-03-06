@@ -1,12 +1,13 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted } from 'vue';
 import { ArrowLeft, Save, Plus, Search, Filter, Trash2, GripVertical, Check, FileText, ChevronRight, ChevronDown } from 'lucide-vue-next';
 import axios from 'axios';
 import { debounce } from 'lodash';
 
 const props = defineProps({
+    exam: Object,
     subjects: {
         type: Array,
         default: () => [],
@@ -22,28 +23,22 @@ const availableQuestions = ref([]);
 const isSearching = ref(false);
 
 const form = useForm({
-    title: '',
-    target_class: '',
-    level_id: '',
-    subject_id: '',
-    paper_id: '',
-    start_time: '',
-    end_time: '',
-    duration_minutes: '',
-    total_marks: 0,
-    mcq_duration_minutes: null,
-    cq_duration_minutes: null,
-    descriptive_duration_minutes: null,
-    mcq_marks_per_question: null,
-    cq_marks_per_question: null,
-    descriptive_marks_per_question: null,
-    is_published: false,
-    questions: [],
+    title: props.exam.title,
+    target_class: props.exam.target_class,
+    level_id: props.exam.level_id,
+    subject_id: props.exam.subject_id,
+    paper_id: props.exam.paper_id,
+    start_time: props.exam.start_time,
+    end_time: props.exam.end_time,
+    duration_minutes: props.exam.duration_minutes,
+    total_marks: props.exam.total_marks,
+    is_published: !!props.exam.is_published,
+    questions: props.exam.questions || [],
 });
 
 // Cascading Filter Logic
 const searchFilters = ref({
-    level_id: '',
+    level_id: props.exam.level_id || '',
     subject_id: '',
     paper_id: '',
     chapter_id: '',
@@ -91,7 +86,6 @@ watch(() => searchFilters.value.chapter_id, () => {
 const fetchQuestions = debounce(async () => {
     isSearching.value = true;
     try {
-        // Filter out empty values to keep query clean
         const params = Object.fromEntries(
             Object.entries(searchFilters.value).filter(([_, v]) => v !== '')
         );
@@ -121,29 +115,11 @@ const removeQuestion = (questionId) => {
 };
 
 const calculateTotalMarks = () => {
-    form.total_marks = form.questions.reduce((sum, q) => {
-        let marks = q.marks;
-        if (q.type === 'mcq' && form.mcq_marks_per_question) marks = parseFloat(form.mcq_marks_per_question);
-        if (q.type === 'cq' && form.cq_marks_per_question) marks = parseFloat(form.cq_marks_per_question);
-        if (q.type === 'descriptive' && form.descriptive_marks_per_question) marks = parseFloat(form.descriptive_marks_per_question);
-        return sum + marks;
-    }, 0);
+    form.total_marks = form.questions.reduce((sum, q) => sum + q.marks, 0);
 };
-
-// Re-calculate marks when overrides change
-watch(() => [form.mcq_marks_per_question, form.cq_marks_per_question, form.descriptive_marks_per_question], calculateTotalMarks);
-
-const calculateTotalDuration = () => {
-    const total = (parseInt(form.mcq_duration_minutes) || 0) + 
-                  (parseInt(form.cq_duration_minutes) || 0) + 
-                  (parseInt(form.descriptive_duration_minutes) || 0);
-    form.duration_minutes = total > 0 ? total : '';
-};
-
-watch(() => [form.mcq_duration_minutes, form.cq_duration_minutes, form.descriptive_duration_minutes], calculateTotalDuration);
 
 const submit = () => {
-    form.post(route('admin.exams.store'));
+    form.put(route('admin.exams.update', props.exam.id));
 };
 
 // Grouped Questions Logic
@@ -183,10 +159,17 @@ const expandedGroups = ref({});
 const toggleGroup = (key) => {
     expandedGroups.value[key] = !expandedGroups.value[key];
 };
+
+// Initialize expanded groups for existing questions
+onMounted(() => {
+    Object.keys(groupedQuestions.value).forEach(key => {
+        expandedGroups.value[key] = true;
+    });
+});
 </script>
 
 <template>
-    <Head title="Create Exam" />
+    <Head title="Edit Exam" />
 
     <AdminLayout>
         <div class="p-4 md:p-6 space-y-6">
@@ -221,7 +204,7 @@ const toggleGroup = (key) => {
                         class="px-4 py-2 bg-gradient-to-r from-[#16A34A] to-[#15803D] hover:shadow-lg hover:shadow-[#16A34A]/30 text-white rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 font-onest disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Save :size="18" />
-                        Create Exam
+                        Update Exam
                     </button>
                 </div>
             </div>
@@ -229,7 +212,7 @@ const toggleGroup = (key) => {
             <div class="bg-[#161B22] border border-[#1F2937] rounded-xl overflow-hidden flex flex-col h-[calc(100vh-140px)]">
                 <!-- Step 1: Exam Details -->
                 <div v-if="step === 1" class="p-6 md:p-8 overflow-y-auto">
-                    <h2 class="text-xl font-bold text-white mb-6 font-montserrat">Exam Details</h2>
+                    <h2 class="text-xl font-bold text-white mb-6 font-montserrat">Edit Exam Details</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="md:col-span-2">
                             <label class="block text-sm font-semibold text-white mb-2 font-onest">Exam Title <span class="text-red-500">*</span></label>
@@ -266,54 +249,17 @@ const toggleGroup = (key) => {
 
                         <div>
                             <label class="block text-sm font-semibold text-white mb-2 font-onest">Paper (Optional)</label>
-                            <!-- Paper logic for exam level is a bit ambiguous if subject is mixed, assuming simpler input or disabled if mixed -->
-                            <!-- Let's keep it as an ID selection if subject is selected, otherwise disabled or hidden? 
-                                 Original was text input? No, original was text input: <input v-model="form.paper" ...>
-                                 But now we have paper_id. Let's make it a select if subject is selected.
-                            -->
                             <select v-if="form.subject_id" v-model="form.paper_id" class="w-full px-4 py-3 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors font-onest">
                                 <option value="">Select Paper (Optional)</option>
                                 <option v-for="paper in subjects.find(s => s.id === form.subject_id)?.papers || []" :key="paper.id" :value="paper.id">{{ paper.name }}</option>
                             </select>
-                             <div v-else class="text-[#9CA3AF] text-sm italic mt-2">Select a subject to choose a paper.</div>
+                            <div v-else class="text-[#9CA3AF] text-sm italic mt-2">Select a subject to choose a paper.</div>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-white mb-2 font-onest">Exam Durations (Minutes) <span class="text-red-500">*</span></label>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label class="block text-xs font-semibold text-[#9CA3AF] mb-1 font-onest">MCQ Duration</label>
-                                    <input v-model="form.mcq_duration_minutes" type="number" min="0" placeholder="Mins" class="w-full px-4 py-3 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors font-onest">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-[#9CA3AF] mb-1 font-onest">CQ Duration</label>
-                                    <input v-model="form.cq_duration_minutes" type="number" min="0" placeholder="Mins" class="w-full px-4 py-3 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors font-onest">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-[#9CA3AF] mb-1 font-onest">Descriptive Duration</label>
-                                    <input v-model="form.descriptive_duration_minutes" type="number" min="0" placeholder="Mins" class="w-full px-4 py-3 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors font-onest">
-                                </div>
-                            </div>
-                            <div class="text-[#9CA3AF] text-xs mt-2 italic">
-                                Total Duration: {{ (parseInt(form.mcq_duration_minutes || 0) + parseInt(form.cq_duration_minutes || 0) + parseInt(form.descriptive_duration_minutes || 0)) }} Minutes
-                            </div>
-                        </div>
-
-                        <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-[#374151] pt-4 mt-2">
-                            <h3 class="md:col-span-3 text-sm font-bold text-[#9CA3AF] uppercase tracking-wider mb-2">Marks per Question (Optional - Overrides Question Default)</h3>
-                            
-                            <div>
-                                <label class="block text-xs font-semibold text-[#9CA3AF] mb-1 font-onest">Mark per MCQ</label>
-                                <input v-model="form.mcq_marks_per_question" type="number" step="0.5" min="0" placeholder="Default" class="w-full px-3 py-2 bg-[#1F2937] border border-[#374151] rounded-lg text-white text-sm focus:outline-none focus:border-[#0D6EFD]">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-[#9CA3AF] mb-1 font-onest">Mark per CQ</label>
-                                <input v-model="form.cq_marks_per_question" type="number" step="0.5" min="0" placeholder="Default" class="w-full px-3 py-2 bg-[#1F2937] border border-[#374151] rounded-lg text-white text-sm focus:outline-none focus:border-[#0D6EFD]">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-[#9CA3AF] mb-1 font-onest">Mark per Descriptive</label>
-                                <input v-model="form.descriptive_marks_per_question" type="number" step="0.5" min="0" placeholder="Default" class="w-full px-3 py-2 bg-[#1F2937] border border-[#374151] rounded-lg text-white text-sm focus:outline-none focus:border-[#0D6EFD]">
-                            </div>
+                            <label class="block text-sm font-semibold text-white mb-2 font-onest">Duration (Minutes) <span class="text-red-500">*</span></label>
+                            <input v-model="form.duration_minutes" type="number" min="1" class="w-full px-4 py-3 bg-[#1F2937] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors font-onest">
+                            <div v-if="form.errors.duration_minutes" class="text-red-500 text-xs mt-1">{{ form.errors.duration_minutes }}</div>
                         </div>
 
                         <div>

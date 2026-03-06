@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -14,105 +13,37 @@ class StudentSeeder extends Seeder
      */
     public function run(): void
     {
-        $students = [
-            [
-                'name' => 'Arif Rahman',
-                'email' => 'arif@example.com',
-                'student_id' => '241073',
-                'class' => '11',
-                'group' => 'Science',
-                'hsc_year' => '2025',
-                'contact_no' => '01711111111',
-                'is_approved' => true,
-            ],
-            [
-                'name' => 'Fatima Khan',
-                'email' => 'fatima@example.com',
-                'student_id' => '241074',
-                'class' => '11',
-                'group' => 'Science',
-                'hsc_year' => '2025',
-                'contact_no' => '01722222222',
-                'is_approved' => true,
-            ],
-            [
-                'name' => 'Samiul Haque',
-                'email' => 'samiul@example.com',
-                'student_id' => '241075',
-                'class' => '12',
-                'group' => 'Science',
-                'hsc_year' => '2024',
-                'contact_no' => '01733333333',
-                'is_approved' => true,
-            ],
-            [
-                'name' => 'Nusrat Jahan',
-                'email' => 'nusrat@example.com',
-                'student_id' => '241076',
-                'class' => '12',
-                'group' => 'Science',
-                'hsc_year' => '2024',
-                'contact_no' => '01744444444',
-                'is_approved' => true,
-            ],
-            [
-                'name' => 'Rafiq Ahmed',
-                'email' => 'rafiq@example.com',
-                'student_id' => '241077',
-                'class' => '11',
-                'group' => 'Science',
-                'hsc_year' => '2025',
-                'contact_no' => '01755555555',
-                'is_approved' => true,
-            ],
-            [
-                'name' => 'Sadia Islam',
-                'email' => 'sadia@example.com',
-                'student_id' => '241078',
-                'class' => '12',
-                'group' => 'Science',
-                'hsc_year' => '2024',
-                'contact_no' => '01766666666',
-                'is_approved' => true,
-            ],
-            [
-                'name' => 'Tariq Hassan',
-                'email' => 'tariq@example.com',
-                'student_id' => '241079',
-                'class' => '11',
-                'group' => 'Science',
-                'hsc_year' => '2025',
-                'contact_no' => '01777777777',
-                'is_approved' => true,
-            ],
-            [
-                'name' => 'Ayesha Begum',
-                'email' => 'ayesha@example.com',
-                'student_id' => '241080',
-                'class' => '12',
-                'group' => 'Science',
-                'hsc_year' => '2024',
-                'contact_no' => '01788888888',
-                'is_approved' => true,
-            ],
-        ];
+        $classes = ['11', '12'];
+        $groups = ['Science', 'Humanities', 'Business Studies'];
+        $baseStudentId = 241000;
+        $counter = 1;
 
-        foreach ($students as $student) {
-            User::create([
-                'name' => $student['name'],
-                'email' => $student['email'],
-                'password' => Hash::make('password'),
-                'role' => 'student',
-                'student_id' => $student['student_id'],
-                'class' => $student['class'],
-                'group' => $student['group'],
-                'hsc_year' => $student['hsc_year'],
-                'contact_no' => $student['contact_no'],
-                'whatsapp_no' => $student['contact_no'], // Using same for now
-                'guardian_no' => $student['contact_no'], // Using same for now
-                'institution' => 'Test College',
-                'is_approved' => $student['is_approved'],
-            ]);
+        foreach ($classes as $class) {
+            foreach ($groups as $group) {
+                // Create 3 students for each class-group combination
+                for ($i = 1; $i <= 3; $i++) {
+                    $studentId = $baseStudentId + $counter;
+                    $hscYear = $class === '11' ? '2026' : '2025';
+                    
+                    User::create([
+                        'name' => "Student {$class} {$group} {$i}",
+                        'email' => "student{$studentId}@lms.com",
+                        'password' => Hash::make('password'),
+                        'role' => 'student',
+                        'student_id' => (string)$studentId,
+                        'class' => $class,
+                        'group' => $group,
+                        'hsc_year' => $hscYear,
+                        'contact_no' => '017' . str_pad((string)$counter, 8, '0', STR_PAD_LEFT),
+                        'whatsapp_no' => '017' . str_pad((string)$counter, 8, '0', STR_PAD_LEFT),
+                        'guardian_no' => '018' . str_pad((string)$counter, 8, '0', STR_PAD_LEFT),
+                        'institution' => 'LightForge Academy',
+                        'is_approved' => true,
+                    ]);
+                    
+                    $counter++;
+                }
+            }
         }
     }
 }

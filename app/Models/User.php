@@ -30,6 +30,7 @@ class User extends Authenticatable
         'guardian_no',
         'role',
         'is_approved',
+        'has_completed_onboarding',
         'password',
         'profile_photo_path',
     ];

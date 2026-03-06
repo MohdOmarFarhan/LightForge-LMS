@@ -8,15 +8,22 @@ class Exam extends Model
 {
     protected $fillable = [
         'title',
-        'class',
-        'subject',
-        'paper',
+        'target_class',
+        'level_id',
+        'subject_id',
+        'paper_id',
         'start_time',
         'end_time',
         'duration_minutes',
         'total_marks',
         'is_published',
         'created_by',
+        'mcq_duration_minutes',
+        'cq_duration_minutes',
+        'descriptive_duration_minutes',
+        'mcq_marks_per_question',
+        'cq_marks_per_question',
+        'descriptive_marks_per_question',
     ];
 
     protected $casts = [
@@ -35,5 +42,20 @@ class Exam extends Model
     public function attempts()
     {
         return $this->hasMany(ExamAttempt::class);
+    }
+
+    public function level()
+    {
+        return $this->belongsTo(Level::class);
+    }
+
+    public function subject()
+    {
+        return $this->belongsTo(Subject::class);
+    }
+
+    public function paper()
+    {
+        return $this->belongsTo(Paper::class);
     }
 }

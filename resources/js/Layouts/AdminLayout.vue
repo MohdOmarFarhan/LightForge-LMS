@@ -12,6 +12,7 @@ import {
     Menu,
     X,
     LogOut,
+    Library,
 } from 'lucide-vue-next';
 
 const sidebarOpen = ref(false);
@@ -19,6 +20,7 @@ const page = usePage();
 
 const navigation = [
     { name: "Dashboard", href: route('admin.dashboard'), icon: Home, active: route().current('admin.dashboard') },
+    { name: "Academic Structure", href: route('admin.academic.structure'), icon: Library, active: route().current('admin.academic.structure') },
     { name: "Students", href: route('admin.students'), icon: Users, active: route().current('admin.students') },
     { name: "Pending Approvals", href: route('admin.students.pending'), icon: UserCheck, active: route().current('admin.students.pending') },
     { name: "Questions", href: route('admin.questions'), icon: FileQuestion, active: route().current('admin.questions') },

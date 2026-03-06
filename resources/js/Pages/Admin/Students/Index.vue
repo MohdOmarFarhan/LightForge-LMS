@@ -2,7 +2,15 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
-import { Search, Filter, Download, Eye, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { Search, Filter, Download, Eye, TrendingUp, ChevronLeft, ChevronRight, Plus, Edit, Trash2 } from 'lucide-vue-next';
+
+// ...
+
+const deleteStudent = (id) => {
+    if (confirm('Are you sure you want to delete this student?')) {
+        router.delete(route('admin.students.destroy', id));
+    }
+};
 import { debounce } from 'lodash';
 
 const props = defineProps({
@@ -29,6 +37,13 @@ watch(searchQuery, debounce((value) => {
         { preserveState: true, preserveScroll: true }
     );
 }, 300));
+
+const exportStudents = () => {
+    window.location.href = route('admin.students.export', {
+        class: selectedClass.value,
+        search: searchQuery.value
+    });
+};
 </script>
 
 <template>
@@ -92,10 +107,17 @@ watch(searchQuery, debounce((value) => {
                                 class="w-full pl-10 pr-4 py-2 bg-[#1F2937] border border-[#374151] rounded-lg text-white placeholder-[#9CA3AF] focus:outline-none focus:border-[#0D6EFD] transition-colors font-onest"
                             />
                         </div>
-                        <button class="px-4 py-2 bg-[#1F2937] hover:bg-[#374151] text-white rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 font-onest">
+                        <button 
+                            @click="exportStudents"
+                            class="px-4 py-2 bg-[#1F2937] hover:bg-[#374151] text-white rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 font-onest"
+                        >
                             <Download :size="18" />
                             Export
                         </button>
+                        <Link :href="route('admin.students.create')" class="px-4 py-2 bg-[#0D6EFD] hover:bg-[#0B5ED7] text-white rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 font-onest">
+                            <Plus :size="18" />
+                            Add Student
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -179,12 +201,22 @@ watch(searchQuery, debounce((value) => {
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <button
-                                        class="inline-flex items-center gap-2 px-4 py-2 bg-[#0D6EFD] hover:bg-[#0B5ED7] text-white rounded-lg text-sm font-semibold transition-all duration-200 font-onest"
-                                    >
-                                        <Eye :size="16" />
-                                        View
-                                    </button>
+                                    <div class="flex items-center gap-2">
+                                        <Link
+                                            :href="route('admin.students.edit', student.id)"
+                                            class="p-2 text-[#9CA3AF] hover:text-[#0D6EFD] hover:bg-[#1F2937] rounded-lg transition-colors"
+                                            title="Edit"
+                                        >
+                                            <Edit :size="18" />
+                                        </Link>
+                                        <button
+                                            @click="deleteStudent(student.id)"
+                                            class="p-2 text-[#9CA3AF] hover:text-red-500 hover:bg-[#1F2937] rounded-lg transition-colors"
+                                            title="Delete"
+                                        >
+                                            <Trash2 :size="18" />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>

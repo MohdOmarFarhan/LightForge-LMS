@@ -1,11 +1,12 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref, computed, watch } from 'vue';
-import { ArrowLeft, Save, Plus, X, Trash2, Copy } from 'lucide-vue-next';
+import { ref, computed, watch, onMounted } from 'vue';
+import { ArrowLeft, Save, Plus, X } from 'lucide-vue-next';
 import RichTextEditor from '@/Components/RichTextEditor.vue';
 
 const props = defineProps({
+    question: Object,
     subjects: {
         type: Array,
         default: () => [],
@@ -17,115 +18,109 @@ const props = defineProps({
 });
 
 const form = useForm({
-    // Common fields
-    level_id: '',
-    subject_id: '',
-    paper_id: '',
-    chapter_id: '',
-    module_id: '',
-    type: 'mcq',
-    difficulty: 'medium',
-    marks: 1,
-    time_limit: null,
-    
-    // List of questions
-    questions: [],
+    level_id: props.question.level_id,
+    subject_id: props.question.subject_id,
+    paper_id: props.question.paper_id,
+    chapter_id: props.question.chapter_id,
+    module_id: props.question.module_id,
+    type: props.question.type,
+    difficulty: props.question.difficulty,
+    marks: props.question.marks,
+    time_limit: props.question.time_limit,
+    content: props.question.content,
+    options: props.question.options || ["", "", "", ""],
+    correct_answer: props.question.correct_answer,
+    sub_questions: props.question.sub_questions || { a: "", b: "", c: "", d: "" },
 });
 
-// Initial question structure
-const createNewQuestion = () => ({
-    id: Date.now() + Math.random(), // unique temp ID
-    content: "",
-    options: ["", "", "", ""],
-    correctOptionIndex: 0,
-    subQuestions: { a: "", b: "", c: "", d: "" }
-});
+// UI State for correct option index
+const correctOptionIndex = ref(0);
 
-const questionsList = ref([createNewQuestion()]);
+// Initialize correctOptionIndex based on correct_answer
+if (form.type === 'mcq' && form.correct_answer && form.options) {
+    const index = form.options.indexOf(form.correct_answer);
+    if (index !== -1) correctOptionIndex.value = index;
+}
 
 // Cascading Dropdown Logic
+const selectedSubjectId = ref(props.question.subject_id);
+const selectedPaperId = ref(props.question.paper_id);
+const selectedChapterId = ref(props.question.chapter_id);
+const selectedModuleId = ref(props.question.module_id);
+
 const availablePapers = computed(() => {
-    const subject = props.subjects.find(s => s.id === form.subject_id);
+    const subject = props.subjects.find(s => s.id === selectedSubjectId.value);
     return subject ? subject.papers : [];
 });
 
 const availableChapters = computed(() => {
-    const paper = availablePapers.value.find(p => p.id === form.paper_id);
+    const paper = availablePapers.value.find(p => p.id === selectedPaperId.value);
     return paper ? paper.chapters : [];
 });
 
 const availableModules = computed(() => {
-    const chapter = availableChapters.value.find(c => c.id === form.chapter_id);
+    const chapter = availableChapters.value.find(c => c.id === selectedChapterId.value);
     return chapter ? chapter.modules : [];
 });
 
 // Watchers
-watch(() => form.subject_id, () => {
-    form.paper_id = ""; form.chapter_id = ""; form.module_id = "";
+watch(selectedSubjectId, (newVal) => {
+    if (newVal !== form.subject_id) {
+        form.subject_id = newVal;
+        selectedPaperId.value = ""; selectedChapterId.value = ""; selectedModuleId.value = "";
+        form.paper_id = ""; form.chapter_id = ""; form.module_id = "";
+    }
 });
 
-watch(() => form.paper_id, () => {
-    form.chapter_id = ""; form.module_id = "";
+watch(selectedPaperId, (newVal) => {
+    if (newVal !== form.paper_id) {
+        form.paper_id = newVal;
+        selectedChapterId.value = ""; selectedModuleId.value = "";
+        form.chapter_id = ""; form.module_id = "";
+    }
 });
 
-watch(() => form.chapter_id, () => {
-    form.module_id = "";
+watch(selectedChapterId, (newVal) => {
+    if (newVal !== form.chapter_id) {
+        form.chapter_id = newVal;
+        selectedModuleId.value = "";
+        form.module_id = "";
+    }
 });
 
-// Question Management
-const addQuestion = () => {
-    questionsList.value.push(createNewQuestion());
+watch(selectedModuleId, (newVal) => {
+    if (newVal !== form.module_id) {
+        form.module_id = newVal;
+    }
+});
+
+const handleAddOption = () => {
+    form.options.push("");
 };
 
-const removeQuestion = (index) => {
-    questionsList.value.splice(index, 1);
-};
-
-const duplicateQuestion = (index) => {
-    const q = questionsList.value[index];
-    const newQ = JSON.parse(JSON.stringify(q));
-    newQ.id = Date.now() + Math.random();
-    questionsList.value.splice(index + 1, 0, newQ);
-};
-
-const handleAddOption = (qIndex) => {
-    questionsList.value[qIndex].options.push("");
-};
-
-const handleRemoveOption = (qIndex, optIndex) => {
-    const q = questionsList.value[qIndex];
-    if (q.options.length > 2) {
-        q.options = q.options.filter((_, i) => i !== optIndex);
-        if (q.correctOptionIndex === optIndex) q.correctOptionIndex = 0;
-        else if (q.correctOptionIndex > optIndex) q.correctOptionIndex--;
+const handleRemoveOption = (optIndex) => {
+    if (form.options.length > 2) {
+        form.options = form.options.filter((_, i) => i !== optIndex);
+        if (correctOptionIndex.value === optIndex) correctOptionIndex.value = 0;
+        else if (correctOptionIndex.value > optIndex) correctOptionIndex.value--;
     }
 };
 
 const submit = () => {
-    // Prepare data
-    form.questions = questionsList.value.map(q => {
-        let qData = { content: q.content };
-        
-        if (form.type === 'mcq') {
-            qData.options = q.options;
-            qData.correct_answer = q.options[q.correctOptionIndex];
-        } else if (form.type === 'cq') {
-            qData.sub_questions = q.subQuestions;
-        }
-        
-        return qData;
-    });
+    if (form.type === 'mcq') {
+        form.correct_answer = form.options[correctOptionIndex.value];
+    }
 
-    form.post(route('admin.questions.store'), {
+    form.put(route('admin.questions.update', props.question.id), {
         onSuccess: () => {
-            // Optional: reset logic
+            // Optional: toast notification
         },
     });
 };
 </script>
 
 <template>
-    <Head title="Add Questions" />
+    <Head title="Edit Question" />
 
     <AdminLayout>
         <div class="p-4 md:p-6 space-y-6">
@@ -138,7 +133,7 @@ const submit = () => {
                     <ArrowLeft :size="20" />
                     <span class="font-semibold">Back to Questions</span>
                 </Link>
-                <h1 class="text-2xl font-bold text-white font-montserrat">Add New Questions</h1>
+                <h1 class="text-2xl font-bold text-white font-montserrat">Edit Question</h1>
             </div>
 
             <form @submit.prevent="submit" class="space-y-6">
@@ -146,16 +141,16 @@ const submit = () => {
                 <div class="bg-[#161B22] border border-[#1F2937] rounded-xl p-6">
                     <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                         <span class="bg-[#0D6EFD] w-1 h-6 rounded-full"></span>
-                        Common Details
+                        Details
                     </h2>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <!-- Level (Formerly Class) -->
+                        <!-- Level/Class -->
                         <div>
                             <label class="block text-sm font-semibold text-[#9CA3AF] mb-2 font-onest">Level *</label>
                             <select v-model="form.level_id" class="w-full px-4 py-2.5 bg-[#0D1117] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors">
                                 <option value="">Select Level</option>
-                                <option v-for="level in levels" :key="level.id" :value="level.id">{{ level.name }}</option>
+                                <option v-for="level in levels" :key="level.id" :value="level.id">{{ level.name }} ({{ level.code }})</option>
                             </select>
                             <div v-if="form.errors.level_id" class="text-red-500 text-xs mt-1">{{ form.errors.level_id }}</div>
                         </div>
@@ -163,7 +158,7 @@ const submit = () => {
                         <!-- Subject -->
                         <div>
                             <label class="block text-sm font-semibold text-[#9CA3AF] mb-2 font-onest">Subject *</label>
-                            <select v-model="form.subject_id" class="w-full px-4 py-2.5 bg-[#0D1117] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors">
+                            <select v-model="selectedSubjectId" class="w-full px-4 py-2.5 bg-[#0D1117] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors">
                                 <option value="">Select Subject</option>
                                 <option v-for="subject in subjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
                             </select>
@@ -173,7 +168,7 @@ const submit = () => {
                         <!-- Paper -->
                         <div>
                             <label class="block text-sm font-semibold text-[#9CA3AF] mb-2 font-onest">Paper *</label>
-                            <select v-model="form.paper_id" :disabled="!form.subject_id" class="w-full px-4 py-2.5 bg-[#0D1117] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors disabled:opacity-50">
+                            <select v-model="selectedPaperId" :disabled="!selectedSubjectId" class="w-full px-4 py-2.5 bg-[#0D1117] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors disabled:opacity-50">
                                 <option value="">Select Paper</option>
                                 <option v-for="paper in availablePapers" :key="paper.id" :value="paper.id">{{ paper.name }}</option>
                             </select>
@@ -183,7 +178,7 @@ const submit = () => {
                         <!-- Chapter -->
                         <div>
                             <label class="block text-sm font-semibold text-[#9CA3AF] mb-2 font-onest">Chapter *</label>
-                            <select v-model="form.chapter_id" :disabled="!form.paper_id" class="w-full px-4 py-2.5 bg-[#0D1117] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors disabled:opacity-50">
+                            <select v-model="selectedChapterId" :disabled="!selectedPaperId" class="w-full px-4 py-2.5 bg-[#0D1117] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors disabled:opacity-50">
                                 <option value="">Select Chapter</option>
                                 <option v-for="chapter in availableChapters" :key="chapter.id" :value="chapter.id">Chapter {{ chapter.number }}: {{ chapter.name }}</option>
                             </select>
@@ -193,7 +188,7 @@ const submit = () => {
                         <!-- Module -->
                         <div>
                             <label class="block text-sm font-semibold text-[#9CA3AF] mb-2 font-onest">Module</label>
-                            <select v-model="form.module_id" :disabled="!form.chapter_id" class="w-full px-4 py-2.5 bg-[#0D1117] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors disabled:opacity-50">
+                            <select v-model="selectedModuleId" :disabled="!selectedChapterId" class="w-full px-4 py-2.5 bg-[#0D1117] border border-[#374151] rounded-lg text-white focus:outline-none focus:border-[#0D6EFD] transition-colors disabled:opacity-50">
                                 <option value="">Select Module</option>
                                 <option v-for="module in availableModules" :key="module.id" :value="module.id">Module {{ module.number }}: {{ module.name }}</option>
                             </select>
@@ -234,55 +229,47 @@ const submit = () => {
                     </div>
                 </div>
 
-                <!-- 2. Questions List -->
-                <div class="space-y-4">
-                    <div v-for="(question, index) in questionsList" :key="question.id" class="bg-[#161B22] border border-[#1F2937] rounded-xl p-6 relative group">
-                        <!-- Header / Actions -->
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-white font-semibold font-montserrat">Question {{ index + 1 }}</h3>
-                            <div class="flex items-center gap-2">
-                                <button type="button" @click="duplicateQuestion(index)" class="p-2 text-[#9CA3AF] hover:text-[#0D6EFD] hover:bg-[#1F2937] rounded-lg transition-colors" title="Duplicate">
-                                    <Copy :size="18" />
-                                </button>
-                                <button v-if="questionsList.length > 1" type="button" @click="removeQuestion(index)" class="p-2 text-[#9CA3AF] hover:text-red-500 hover:bg-[#1F2937] rounded-lg transition-colors" title="Remove">
-                                    <Trash2 :size="18" />
-                                </button>
-                            </div>
-                        </div>
+                <!-- 2. Question Content -->
+                <div class="bg-[#161B22] border border-[#1F2937] rounded-xl p-6">
+                    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <span class="bg-[#0D6EFD] w-1 h-6 rounded-full"></span>
+                        Content
+                    </h2>
 
-                        <!-- Question Content -->
+                    <div class="space-y-4">
+                         <!-- Question Content -->
                         <div class="mb-4">
                             <label class="block text-sm font-semibold text-[#9CA3AF] mb-2 font-onest">
                                 {{ form.type === 'cq' ? 'Stem/Passage' : 'Question Content' }} *
                             </label>
                             <RichTextEditor
-                                v-model="question.content"
+                                v-model="form.content"
                                 placeholder="Enter question text..."
                             />
-                            <div v-if="form.errors[`questions.${index}.content`]" class="text-red-500 text-xs mt-1">Content is required</div>
+                            <div v-if="form.errors.content" class="text-red-500 text-xs mt-1">Content is required</div>
                         </div>
 
                         <!-- MCQ Options -->
                         <div v-if="form.type === 'mcq'" class="space-y-3 pl-4 border-l-2 border-[#1F2937]">
-                            <div v-for="(opt, optIndex) in question.options" :key="optIndex" class="flex items-center gap-3">
+                            <div v-for="(opt, optIndex) in form.options" :key="optIndex" class="flex items-center gap-3">
                                 <input
                                     type="radio"
-                                    :name="`correct-${question.id}`"
-                                    :checked="question.correctOptionIndex === optIndex"
-                                    @change="question.correctOptionIndex = optIndex"
+                                    name="correct-option"
+                                    :checked="correctOptionIndex === optIndex"
+                                    @change="correctOptionIndex = optIndex"
                                     class="w-4 h-4 text-[#0D6EFD] bg-[#0D1117] border-[#374151]"
                                 />
                                 <input
                                     type="text"
-                                    v-model="question.options[optIndex]"
+                                    v-model="form.options[optIndex]"
                                     :placeholder="`Option ${String.fromCharCode(65 + optIndex)}`"
                                     class="flex-1 px-3 py-2 bg-[#0D1117] border border-[#374151] rounded-lg text-white text-sm focus:outline-none focus:border-[#0D6EFD] transition-colors"
                                 />
-                                <button v-if="question.options.length > 2" type="button" @click="handleRemoveOption(index, optIndex)" class="text-[#EF4444] hover:bg-[#1F2937] p-1.5 rounded">
+                                <button v-if="form.options.length > 2" type="button" @click="handleRemoveOption(optIndex)" class="text-[#EF4444] hover:bg-[#1F2937] p-1.5 rounded">
                                     <X :size="16" />
                                 </button>
                             </div>
-                            <button type="button" @click="handleAddOption(index)" class="text-xs font-semibold text-[#0D6EFD] hover:underline flex items-center gap-1 mt-2">
+                            <button type="button" @click="handleAddOption" class="text-xs font-semibold text-[#0D6EFD] hover:underline flex items-center gap-1 mt-2">
                                 <Plus :size="14" /> Add Option
                             </button>
                         </div>
@@ -292,23 +279,13 @@ const submit = () => {
                             <div v-for="letter in ['a', 'b', 'c', 'd']" :key="letter">
                                 <label class="block text-xs font-semibold text-[#9CA3AF] mb-1 uppercase">Question {{ letter }}</label>
                                 <RichTextEditor
-                                    v-model="question.subQuestions[letter]"
+                                    v-model="form.sub_questions[letter]"
                                     placeholder="Enter sub-question..."
                                 />
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Add More Button -->
-                <button
-                    type="button"
-                    @click="addQuestion"
-                    class="w-full py-4 border-2 border-dashed border-[#374151] rounded-xl text-[#9CA3AF] hover:text-white hover:border-[#0D6EFD] hover:bg-[#161B22] transition-all flex items-center justify-center gap-2 font-semibold"
-                >
-                    <Plus :size="20" />
-                    Add Another Question
-                </button>
 
                 <!-- Footer Actions -->
                 <div class="flex gap-4 pt-4 border-t border-[#1F2937]">
@@ -324,7 +301,7 @@ const submit = () => {
                         class="flex-1 px-6 py-3 bg-gradient-to-r from-[#16A34A] to-[#15803D] hover:shadow-lg hover:shadow-[#16A34A]/30 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
                     >
                         <Save :size="20" />
-                        Save All Questions
+                        Save Changes
                     </button>
                 </div>
             </form>
