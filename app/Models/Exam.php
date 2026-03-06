@@ -36,7 +36,7 @@ class Exam extends Model
     {
         return $this->belongsToMany(Question::class, 'exam_questions')
             ->withPivot('order')
-            ->orderBy('pivot_order');
+            ->orderByPivot('order');
     }
 
     public function attempts()

@@ -97,8 +97,7 @@ class ExamSessionController extends Controller
 
         $exam = Exam::with(['questions' => function($q) use ($section) {
             $q->where('type', $section)
-              ->select('questions.id', 'type', 'content', 'options', 'marks', 'sub_questions')
-              ->orderBy('pivot_order');
+              ->orderByPivot('order');
         }])->findOrFail($id);
 
         $attempt = ExamAttempt::where('exam_id', $id)
